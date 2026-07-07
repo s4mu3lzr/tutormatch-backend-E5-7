@@ -1,0 +1,47 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Puerto de Auth Server
+          issuer-uri: http://localhost:8081
+
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            routes:
+              # Microservicio de Usuarios
+              - id: ms-usuarios
+                uri: lb://ms-usuarios
+                predicates:
+                  - Path=/api/usuarios/**
+                filters:
+                  - StripPrefix=0
+
+              # Microservicio Core (Tutorías e Inscripciones)
+              - id: ms-core
+                uri: lb://ms-core
+                predicates:
+                  - Path=/api/core/**
+                filters:
+                  - StripPrefix=0
+
+              # Microservicio de Evaluaciones
+              - id: ms-evaluaciones
+                uri: lb://ms-evaluaciones
+                predicates:
+                  - Path=/api/evaluaciones/**
+                filters:
+                  - StripPrefix=0
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/

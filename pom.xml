@@ -19,6 +19,9 @@
     <modules>
         <module>auth</module>
         <module>eureka-server</module>
+        <module>gateway</module>
+        <module>ms-usuarios</module>
+        <module>ms-core</module>
+        <module>ms-notificaciones</module>
     </modules>
-
 </project>
