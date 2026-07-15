@@ -26,6 +26,14 @@ public class Sesion {
     @Column(name = "tutor_id", nullable = false)
     private UUID tutorId;
 
+    /**
+     * Nombre del tutor guardado al momento de crear la sesión.
+     * Se extrae del claim "nombre" del JWT para evitar llamadas HTTP a ms-usuarios.
+     * Permite filtrar en el catálogo por nombre del tutor (HU-13).
+     */
+    @Column(name = "tutor_nombre", length = 255)
+    private String tutorNombre;
+
     @Column(name = "titulo", nullable = false, length = 255)
     private String titulo;
 

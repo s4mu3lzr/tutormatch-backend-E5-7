@@ -21,6 +21,7 @@ public class SesionResponseDto {
 
     private UUID id;
     private UUID tutorId;
+    private String tutorNombre;
     private String titulo;
     private String descripcion;
     private String lugar;

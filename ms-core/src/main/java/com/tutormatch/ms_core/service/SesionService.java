@@ -1,14 +1,13 @@
 package com.tutormatch.ms_core.service;
 
-import com.tutormatch.ms_core.dto.SesionRequestDto;
-import com.tutormatch.ms_core.dto.SesionResponseDto;
-import com.tutormatch.ms_core.dto.SesionUpdateDto;
+import com.tutormatch.ms_core.dto.*;
 import com.tutormatch.ms_core.entity.Sesion;
 import com.tutormatch.ms_core.repository.InscripcionRepository;
 import com.tutormatch.ms_core.repository.SesionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -34,14 +33,8 @@ public class SesionService {
     // HU-09: Publicar nueva sesión
     // =========================================================================
 
-    /**
-     * Publica una nueva sesión de tutoría con las siguientes validaciones:
-     * 1. La fecha debe ser al menos 1 hora en el futuro.
-     * 2. El cupo máximo debe ser >= 1.
-     * 3. No puede haber cruce de horarios con otras sesiones ACTIVAS del mismo tutor (±2h).
-     */
     @Transactional
-    public SesionResponseDto publicarSesion(SesionRequestDto dto, UUID tutorId) {
+    public SesionResponseDto publicarSesion(SesionRequestDto dto, UUID tutorId, String tutorNombre) {
 
         // --- VALIDACIÓN 1: Fecha futura (mínimo 1 hora) ---
         LocalDateTime limiteMinimo = LocalDateTime.now().plusHours(1);
@@ -53,9 +46,7 @@ public class SesionService {
 
         // --- VALIDACIÓN 2: Cupo positivo ---
         if (dto.getCupoMaximo() == null || dto.getCupoMaximo() < 1) {
-            throw new IllegalArgumentException(
-                "El cupo máximo debe ser al menos 1 alumno."
-            );
+            throw new IllegalArgumentException("El cupo máximo debe ser al menos 1 alumno.");
         }
 
         // --- VALIDACIÓN 3: Cruce de horarios con sesiones ACTIVAS (ventana ±2h) ---
@@ -78,93 +69,63 @@ public class SesionService {
         // --- GUARDAR ---
         Sesion nueva = new Sesion();
         nueva.setTutorId(tutorId);
+        nueva.setTutorNombre(tutorNombre != null ? tutorNombre : "Tutor");
         nueva.setTitulo(dto.getTitulo());
         nueva.setDescripcion(dto.getDescripcion());
         nueva.setLugar(dto.getLugar());
         nueva.setFechaHora(dto.getFechaHora());
         nueva.setCupoMaximo(dto.getCupoMaximo());
-        nueva.setCupoDisponible(dto.getCupoMaximo()); // Al crear, disponible = máximo
+        nueva.setCupoDisponible(dto.getCupoMaximo());
         nueva.setEstado(ESTADO_ACTIVA);
 
         return mapToResponseDto(sesionRepository.save(nueva));
     }
 
     // =========================================================================
-    // HU-10: Visualizar "Mi Agenda" — sesiones futuras ordenadas cronológicamente
+    // HU-10: Agenda del Tutor — sesiones futuras ordenadas
     // =========================================================================
 
-    /**
-     * Retorna todas las sesiones ACTIVAS y futuras del tutor ordenadas cronológicamente.
-     * Cada sesión incluye el contador de inscritos (inscritos/cupoMaximo).
-     *
-     * @param tutorId UUID del tutor extraído del JWT
-     */
     public List<SesionResponseDto> obtenerAgendaTutor(UUID tutorId) {
-        List<Sesion> sesiones = sesionRepository
+        return sesionRepository
             .findByTutorIdAndEstadoAndFechaHoraAfterOrderByFechaHoraAsc(
                 tutorId, ESTADO_ACTIVA, LocalDateTime.now()
-            );
-
-        return sesiones.stream()
+            )
+            .stream()
             .map(this::mapToResponseDto)
             .collect(Collectors.toList());
     }
 
     // =========================================================================
-    // HU-11: Editar una sesión existente
+    // HU-11: Editar sesión
     // =========================================================================
 
-    /**
-     * Actualiza los datos de una sesión perteneciente al tutor autenticado.
-     *
-     * Reglas de negocio:
-     * - Solo el tutor propietario puede editar su sesión.
-     * - Solo se pueden editar sesiones en estado ACTIVA.
-     * - Si la sesión ya tiene alumnos inscritos (CONFIRMADA), el campo fechaHora
-     *   queda bloqueado: se lanza excepción si el cliente intenta cambiarlo.
-     * - El cupoMaximo no puede reducirse por debajo del número actual de inscritos.
-     *
-     * @param sesionId ID de la sesión a editar
-     * @param dto      Datos nuevos del formulario
-     * @param tutorId  UUID del tutor autenticado (del JWT)
-     */
     @Transactional
     public SesionResponseDto actualizarSesion(UUID sesionId, SesionUpdateDto dto, UUID tutorId) {
 
         Sesion sesion = sesionRepository.findById(sesionId)
             .orElseThrow(() -> new IllegalArgumentException("Sesión no encontrada."));
 
-        // Solo el tutor dueño puede editar
         if (!sesion.getTutorId().equals(tutorId)) {
             throw new SecurityException("No tienes permiso para editar esta sesión.");
         }
-
-        // No se puede editar una sesión cancelada
         if (ESTADO_CANCELADA.equals(sesion.getEstado())) {
             throw new IllegalArgumentException("No se puede editar una sesión cancelada.");
         }
 
-        // Contar inscritos activos
         long inscritos = inscripcionRepository.countBySesionIdAndEstado(sesionId, INSCRIPCION_CONFIRMADA);
 
-        // --- BLOQUEO DE FECHA si hay inscritos ---
         if (dto.getFechaHora() != null && !dto.getFechaHora().equals(sesion.getFechaHora())) {
             if (inscritos > 0) {
                 throw new IllegalArgumentException(
-                    "No puedes cambiar la fecha/hora porque ya hay " + inscritos +
-                    " alumno(s) inscrito(s). Solo puedes modificar el título, descripción, lugar y cupo."
+                    "No puedes cambiar la fecha/hora porque ya hay " + inscritos + " alumno(s) inscrito(s)."
                 );
             }
-            // Validar que la nueva fecha sea futura
             if (dto.getFechaHora().isBefore(LocalDateTime.now().plusHours(1))) {
-                throw new IllegalArgumentException(
-                    "La nueva fecha debe ser al menos 1 hora en el futuro."
-                );
+                throw new IllegalArgumentException("La nueva fecha debe ser al menos 1 hora en el futuro.");
             }
             sesion.setFechaHora(dto.getFechaHora());
         }
 
-        // --- VALIDACIÓN DE CUPO ---
         if (dto.getCupoMaximo() != null) {
             if (dto.getCupoMaximo() < 1) {
                 throw new IllegalArgumentException("El cupo máximo debe ser al menos 1.");
@@ -175,13 +136,11 @@ public class SesionService {
                     "al número de alumnos ya inscritos (" + inscritos + ")."
                 );
             }
-            // Ajustar cupo disponible proporcionalmente
             int diferencia = dto.getCupoMaximo() - sesion.getCupoMaximo();
             sesion.setCupoMaximo(dto.getCupoMaximo());
             sesion.setCupoDisponible(Math.max(0, sesion.getCupoDisponible() + diferencia));
         }
 
-        // Actualizar campos libres
         if (dto.getTitulo()      != null) sesion.setTitulo(dto.getTitulo());
         if (dto.getDescripcion() != null) sesion.setDescripcion(dto.getDescripcion());
         if (dto.getLugar()       != null) sesion.setLugar(dto.getLugar());
@@ -193,37 +152,21 @@ public class SesionService {
     // HU-12: Cancelar sesión (borrado lógico)
     // =========================================================================
 
-    /**
-     * Cancela lógicamente una sesión del tutor autenticado.
-     *
-     * El estado pasa de ACTIVA → CANCELADA. La fila NO se borra de la BD.
-     * Esto permite preparar la notificación a alumnos (EP-06).
-     *
-     * @param sesionId ID de la sesión a cancelar
-     * @param tutorId  UUID del tutor autenticado (del JWT)
-     */
     @Transactional
     public void cancelarSesion(UUID sesionId, UUID tutorId) {
-
         Sesion sesion = sesionRepository.findById(sesionId)
             .orElseThrow(() -> new IllegalArgumentException("Sesión no encontrada."));
 
-        // Solo el dueño puede cancelar
         if (!sesion.getTutorId().equals(tutorId)) {
             throw new SecurityException("No tienes permiso para cancelar esta sesión.");
         }
-
-        // Ya está cancelada
         if (ESTADO_CANCELADA.equals(sesion.getEstado())) {
             throw new IllegalArgumentException("La sesión ya está cancelada.");
         }
 
-        // Borrado lógico: cambiar estado
         sesion.setEstado(ESTADO_CANCELADA);
         sesionRepository.save(sesion);
 
-        // PREPARACIÓN EP-06: aquí se dispararía el evento de notificación.
-        // Por ahora queda registrado en los logs con los datos para notificar.
         long inscritos = inscripcionRepository.countBySesionIdAndEstado(sesionId, INSCRIPCION_CONFIRMADA);
         if (inscritos > 0) {
             System.out.println("[EP-06 PENDIENTE] Sesión " + sesionId + " cancelada con " +
@@ -232,13 +175,30 @@ public class SesionService {
     }
 
     // =========================================================================
-    // Método auxiliar: Entity → DTO
+    // HU-13: Catálogo público con filtros opcionales
     // =========================================================================
 
     /**
-     * Convierte una Entity Sesion a su DTO de respuesta.
-     * Calcula el contador de inscritos en tiempo real desde la tabla inscripciones.
+     * Retorna el catálogo de sesiones disponibles para el público.
+     * Los parámetros son opcionales (null = sin filtro).
+     * IMPORTANTE: El DTO resultante (CatalogoSesionDto) NO incluye el campo "lugar".
+     *
+     * @param materia  Texto parcial para buscar en el título de la sesión
+     * @param tutor    Texto parcial para buscar en el nombre del tutor
+     * @param fecha    Fecha exacta (yyyy-MM-dd) para filtrar
      */
+    public List<CatalogoSesionDto> getCatalogo(String materia, String tutor, LocalDate fecha) {
+        return sesionRepository
+            .findCatalogo(LocalDateTime.now(), materia, tutor, fecha)
+            .stream()
+            .map(this::mapToCatalogoDto)
+            .collect(Collectors.toList());
+    }
+
+    // =========================================================================
+    // Métodos auxiliares: Entity → DTO
+    // =========================================================================
+
     public SesionResponseDto mapToResponseDto(Sesion sesion) {
         int inscritos = (int) inscripcionRepository
             .countBySesionIdAndEstado(sesion.getId(), INSCRIPCION_CONFIRMADA);
@@ -246,6 +206,7 @@ public class SesionService {
         return new SesionResponseDto(
             sesion.getId(),
             sesion.getTutorId(),
+            sesion.getTutorNombre(),
             sesion.getTitulo(),
             sesion.getDescripcion(),
             sesion.getLugar(),
@@ -256,5 +217,31 @@ public class SesionService {
             sesion.getEstado(),
             sesion.getCreadoEn()
         );
+    }
+
+    private CatalogoSesionDto mapToCatalogoDto(Sesion sesion) {
+        int inscritos = (int) inscripcionRepository
+            .countBySesionIdAndEstado(sesion.getId(), INSCRIPCION_CONFIRMADA);
+
+        return new CatalogoSesionDto(
+            sesion.getId(),
+            sesion.getTutorNombre(),
+            sesion.getTitulo(),
+            sesion.getDescripcion(),
+            // lugar NO incluido en catálogo (seguridad HU-13)
+            sesion.getFechaHora(),
+            sesion.getCupoMaximo(),
+            sesion.getCupoDisponible(),
+            inscritos,
+            null   // calificación → null hasta que EP-05 lo implemente
+        );
+    }
+
+    /**
+     * Búsqueda de sesión por ID con acceso público (para InscripcionService).
+     */
+    public Sesion findById(UUID id) {
+        return sesionRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Sesión no encontrada: " + id));
     }
 }

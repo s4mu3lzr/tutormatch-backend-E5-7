@@ -19,6 +19,8 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        // HU-13: el catálogo es público — cualquiera puede verlo sin login
+                        .requestMatchers("/api/core/sesiones-tutorias/catalogo").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
