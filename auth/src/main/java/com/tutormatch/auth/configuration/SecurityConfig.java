@@ -100,7 +100,7 @@ public class SecurityConfig {
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 // Redirección hacia tu frontend en Angular (ajustaremos este puerto después si
                 // es necesario)
-                .redirectUri("http://localhost:4200/app/home") // Redirección tras login
+                .redirectUri("http://localhost:4200/") // Redirección tras login
                 .postLogoutRedirectUri("http://localhost:4200/") // Redirección tras logout
                 .scope(OidcScopes.OPENID)
                 .scope(OidcScopes.PROFILE)
