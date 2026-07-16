@@ -188,8 +188,10 @@ public class SesionService {
      * @param fecha    Fecha exacta (yyyy-MM-dd) para filtrar
      */
     public List<CatalogoSesionDto> getCatalogo(String materia, String tutor, LocalDate fecha) {
+        // Convertimos LocalDate a String para la native query (evita el bug lower(bytea))
+        String fechaStr = (fecha != null) ? fecha.toString() : null;
         return sesionRepository
-            .findCatalogo(LocalDateTime.now(), materia, tutor, fecha)
+            .findCatalogo(LocalDateTime.now(), materia, tutor, fechaStr)
             .stream()
             .map(this::mapToCatalogoDto)
             .collect(Collectors.toList());

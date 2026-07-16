@@ -62,12 +62,12 @@ public class InscripcionService {
             throw new IllegalArgumentException("No puedes inscribirte a una sesión que ya pasó.");
         }
 
-        // 2. Verificar que no esté ya inscrito (evitar duplicados)
-        boolean yaInscrito = inscripcionRepository
-            .findBySesionIdAndAlumnoIdAndEstado(dto.getSesionId(), alumnoId, INSCRIPCION_CONFIRMADA)
-            .isPresent();
+        // 2. Buscar si ya existe un registro de inscripción (confirmada o cancelada)
+        Inscripcion inscripcion = inscripcionRepository
+            .findBySesionIdAndAlumnoId(dto.getSesionId(), alumnoId)
+            .orElse(new Inscripcion());
 
-        if (yaInscrito) {
+        if (INSCRIPCION_CONFIRMADA.equals(inscripcion.getEstado())) {
             throw new IllegalArgumentException("Ya estás inscrito en esta sesión.");
         }
 
@@ -76,8 +76,7 @@ public class InscripcionService {
             throw new IllegalArgumentException("Esta sesión ya no tiene cupo disponible.");
         }
 
-        // 4. Crear inscripción
-        Inscripcion inscripcion = new Inscripcion();
+        // 4. Crear o actualizar inscripción
         inscripcion.setSesionId(dto.getSesionId());
         inscripcion.setAlumnoId(alumnoId);
         inscripcion.setEstado(INSCRIPCION_CONFIRMADA);

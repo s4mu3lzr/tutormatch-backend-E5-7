@@ -24,6 +24,11 @@ public interface InscripcionRepository extends JpaRepository<Inscripcion, UUID> 
     Optional<Inscripcion> findBySesionIdAndAlumnoIdAndEstado(UUID sesionId, UUID alumnoId, String estado);
 
     /**
+     * Buscar inscripción sin importar el estado. Útil para re-inscribirse tras cancelar.
+     */
+    Optional<Inscripcion> findBySesionIdAndAlumnoId(UUID sesionId, UUID alumnoId);
+
+    /**
      * HU-15/HU-16: Obtener todas las inscripciones CONFIRMADAS de un alumno.
      * El filtro de fecha futura se aplica en el service consultando la sesión.
      */
