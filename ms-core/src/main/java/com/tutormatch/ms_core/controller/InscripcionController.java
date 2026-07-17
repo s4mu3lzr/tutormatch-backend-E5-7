@@ -39,7 +39,7 @@ public class InscripcionController {
             @RequestBody InscripcionRequestDto dto,
             @AuthenticationPrincipal Jwt jwt) {
 
-        String correoAlumno = jwt.getClaimAsString("sub");
+        String correoAlumno = jwt.getClaimAsString("email");
         UUID alumnoId = UUID.fromString(jwt.getClaimAsString("usuario_id"));
         Inscripcion inscripcion = inscripcionService.inscribirse(correoAlumno, dto, alumnoId);
         return ResponseEntity.status(HttpStatus.CREATED).body(inscripcion);
@@ -88,7 +88,7 @@ public class InscripcionController {
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt) {
 
-        String correoAlumno = jwt.getClaimAsString("sub");
+        String correoAlumno = jwt.getClaimAsString("email");
         UUID alumnoId = UUID.fromString(jwt.getClaimAsString("usuario_id"));
         inscripcionService.cancelarInscripcion(correoAlumno, id, alumnoId);
         return ResponseEntity.noContent().build();
